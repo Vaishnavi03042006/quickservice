@@ -1,56 +1,105 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import Card from "../components/card";
-import { FaUserAlt, FaKey } from "react-icons/fa";
+import { FaUserAlt, FaKey, FaEye, FaEyeSlash } from "react-icons/fa";
+
+const API_BASE = "http://localhost:8080";
 
 export default function Login() {
-  const [form, setForm] = useState({ username: "", password: "" });
+  const [form, setForm] = useState({ email: "", password: "" });
+  const [status, setStatus] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   function handleChange(e) {
     setForm({ ...form, [e.target.name]: e.target.value });
   }
 
-  function handleSubmit(e) {
-  
+  async function handleSubmit(e) {
     e.preventDefault();
-    alert("Login success (prototype)");
+    setStatus("Signing in...");
+
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: form.email,
+          password: form.password,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setStatus(data?.message || "Login failed");
+        return;
+      }
+
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("role", data.role);
+
+      setStatus("Login success!");
+    } catch (err) {
+      console.log(err);
+      setStatus("Network error");
+    }
   }
 
   return (
-    <Card>
-      <h1 className="brand">Quickserve</h1>
-      <p className="subtitle">Sign in to your account</p>
+      <Card>
+        <h1 className="brand">Quickserve</h1>
+        <p className="subtitle">Sign in to your account</p>
 
-      <form className="form" onSubmit={handleSubmit}>
+        <form className="form" onSubmit={handleSubmit}>
+          <label className="input-pill">
+            <FaUserAlt />
+            <input
+                type="email"
+                name="email"
+                placeholder="Email"
+                onChange={handleChange}
+                value={form.email}
+                required
+            />
+          </label>
 
-        <label className="input-pill">
-          <FaUserAlt />
-          <input
-            type="text"
-            name="username"
-            placeholder="Username"
-            onChange={handleChange}
-          />
-        </label>
+          <label className="input-pill" style={{ position: "relative" }}>
+            <FaKey />
+            <input
+                type={showPassword ? "text" : "password"}
+                name="password"
+                placeholder="Password"
+                onChange={handleChange}
+                value={form.password}
+                required
+            />
+            <button
+                type="button"
+                onClick={() => setShowPassword((s) => !s)}
+                style={{
+                  position: "absolute",
+                  right: 10,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  background: "transparent",
+                  border: "none",
+                  padding: 4,
+                  cursor: "pointer",
+                }}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+            >
+              {showPassword ? <FaEyeSlash /> : <FaEye />}
+            </button>
+          </label>
 
-        <label className="input-pill">
-          <FaKey />
-          <input
-            type="password"
-            name="password"
-            placeholder="Password"
-            onChange={handleChange}
-          />
-        </label>
+          <button className="cta" type="submit">Login</button>
 
-        <button className="cta" type="submit">Login</button>
+          <div className="links">
+            <Link to="/register">Create new account</Link>
+          </div>
 
-        <div className="links">
-          <Link to="/register">Create new account</Link>
-        </div>
-
-      </form>
-    </Card>
+          <div style={{ marginTop: 12 }}>{status}</div>
+        </form>
+      </Card>
   );
 }
-
