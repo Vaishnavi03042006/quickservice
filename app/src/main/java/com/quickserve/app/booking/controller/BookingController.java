@@ -1,6 +1,5 @@
 package com.quickserve.app.booking.controller;
 
-
 import com.quickserve.app.booking.dto.BookingRequest;
 import com.quickserve.app.booking.entity.Booking;
 import com.quickserve.app.booking.service.BookingService;
@@ -14,28 +13,25 @@ public class BookingController {
 
     private final BookingService bookingService;
 
-    public BookingController(BookingService BookingService) {
-        this.bookingService = BookingService;
+    public BookingController(BookingService bookingService) {
+        this.bookingService = bookingService;
     }
 
     @PostMapping
     public Booking create(@RequestBody BookingRequest request) {
-        return bookingService.createBooking(request);
+        // TEMP values (JWT later)
+        System.out.println("Controller reached");
+        return bookingService.createBooking(1L, 10L, request);
     }
 
     @GetMapping
-    public List<Booking> getAll() {
-        return bookingService.getAllBookings();
-    }
-
-    @GetMapping("/{id}")
-    public Booking getById(@PathVariable Long id) {
-        return bookingService.getBookingById(id);
+    public List<Booking> myBookings() {
+        return bookingService.getBookingsForUser(1L);
     }
 
     @PutMapping("/{id}/cancel")
     public String cancel(@PathVariable Long id) {
-        bookingService.cancelBooking(id);
+        bookingService.cancelBooking(id, 1L);
         return "Booking cancelled";
     }
 }

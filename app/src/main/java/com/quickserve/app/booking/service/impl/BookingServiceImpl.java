@@ -1,65 +1,71 @@
-// FIX OPTION A (RECOMMENDED): Update BookingServiceImpl to implement ALL methods
-
 package com.quickserve.app.booking.service.impl;
 
 import com.quickserve.app.booking.dto.BookingRequest;
 import com.quickserve.app.booking.entity.Booking;
+import com.quickserve.app.booking.entity.BookingStatus;
 import com.quickserve.app.booking.repository.BookingRepository;
 import com.quickserve.app.booking.service.BookingService;
+import com.quickserve.app.calendar.repository.CalendarAvailabilityRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.time.OffsetDateTime;
 import java.util.List;
 
 @Service
+@Transactional
 public class BookingServiceImpl implements BookingService {
 
     private final BookingRepository bookingRepository;
+    private final CalendarAvailabilityRepository availabilityRepository;
 
-    public BookingServiceImpl(BookingRepository bookingRepository) {
+    public BookingServiceImpl(
+            BookingRepository bookingRepository,
+            CalendarAvailabilityRepository availabilityRepository) {
         this.bookingRepository = bookingRepository;
+        this.availabilityRepository = availabilityRepository;
     }
 
     @Override
-    public Booking createBooking(BookingRequest request) {
+    public Booking createBooking(Long userId, Long providerId, BookingRequest request) {
 
-        OffsetDateTime start = request.getStartTime();
-        OffsetDateTime end = start.plusHours(1);
+        if (availabilityRepository.findMatchingAvailability(
+                request.getServiceListingId(),
+                request.getStartTime(),
+                request.getEndTime()
+        ).isEmpty()) {
+            throw new RuntimeException("Service not available for selected time");
+        }
 
-        boolean conflict = bookingRepository.existsConflictingBooking(
-                request.getProviderId(), start, end
-        );
-
-        if (conflict) {
+        if (!bookingRepository.findOverlappingBookings(
+                providerId,
+                request.getStartTime(),
+                request.getEndTime(),
+                BookingStatus.CANCELLED
+        ).isEmpty()) {
             throw new RuntimeException("Time slot already booked");
         }
 
         Booking booking = new Booking();
-        booking.setUserId(request.getUserId());
-        booking.setProviderId(request.getProviderId());
+        booking.setUserId(userId);
+        booking.setProviderId(providerId);
         booking.setServiceListingId(request.getServiceListingId());
-        booking.setStartTime(start);
-        booking.setEndTime(end);
-        booking.setStatus(Booking.BookingStatus.PENDING);
+        booking.setStartTime(request.getStartTime());
+        booking.setEndTime(request.getEndTime());
+        booking.setStatus(BookingStatus.PENDING);
 
         return bookingRepository.save(booking);
     }
 
     @Override
-    public List<Booking> getAllBookings() {
-        return bookingRepository.findAll();
-    }
-
-    @Override
-    public Booking getBookingById(Long id) {
-        return bookingRepository.findById(id)
+    public void cancelBooking(Long bookingId, Long userId) {
+        Booking booking = bookingRepository.findByIdAndUserId(bookingId, userId)
                 .orElseThrow(() -> new RuntimeException("Booking not found"));
+
+        booking.setStatus(BookingStatus.CANCELLED);
     }
 
     @Override
-    public void cancelBooking(Long bookingId) {
-        Booking booking = getBookingById(bookingId);
-        booking.setStatus(Booking.BookingStatus.CANCELLED);
-        bookingRepository.save(booking);
+    public List<Booking> getBookingsForUser(Long userId) {
+        return bookingRepository.findByUserId(userId);
     }
 }

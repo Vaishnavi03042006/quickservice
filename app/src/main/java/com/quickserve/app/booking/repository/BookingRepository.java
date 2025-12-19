@@ -1,26 +1,33 @@
 package com.quickserve.app.booking.repository;
 
 import com.quickserve.app.booking.entity.Booking;
+import com.quickserve.app.booking.entity.BookingStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
-import org.springframework.stereotype.Repository;
 
 import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.Optional;
 
-@Repository
 public interface BookingRepository extends JpaRepository<Booking, Long> {
 
+    List<Booking> findByUserId(Long userId);
+
+    List<Booking> findByProviderId(Long providerId);
+
     @Query("""
-        SELECT CASE WHEN COUNT(b) > 0 THEN true ELSE false END
-        FROM Booking b
+        SELECT b FROM Booking b
         WHERE b.providerId = :providerId
           AND b.startTime < :endTime
           AND b.endTime > :startTime
-          AND b.status <> 'CANCELLED'
+          AND b.status <> :cancelled
     """)
-    boolean existsConflictingBooking(
+    List<Booking> findOverlappingBookings(
             Long providerId,
             OffsetDateTime startTime,
-            OffsetDateTime endTime
+            OffsetDateTime endTime,
+            BookingStatus cancelled
     );
+
+    Optional<Booking> findByIdAndUserId(Long id, Long userId);
 }
