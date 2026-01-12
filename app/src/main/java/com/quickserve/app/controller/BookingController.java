@@ -1,5 +1,6 @@
 package com.quickserve.app.controller;
 
+import com.quickserve.app.dto.BookingDetailResponse;
 import com.quickserve.app.dto.BookingRequest;
 import com.quickserve.app.model.Booking;
 import com.quickserve.app.service.BookingService;
@@ -53,6 +54,20 @@ public class BookingController {
         );
     }
 
+    @GetMapping("/my/{id}")
+    public ResponseEntity<BookingDetailResponse> getMyBookingDetail(
+            @PathVariable Long id,
+            Authentication authentication
+    ) {
+        String email = authentication.getName();
+
+        BookingDetailResponse response =
+                bookingService.getMyBookingDetailByEmail(id, email);
+
+        return ResponseEntity.ok(response);
+    }
+
+
     // ✅ Get bookings for PROVIDER
     @GetMapping("/provider")
     public ResponseEntity<List<Booking>> getProviderBookings(
@@ -85,6 +100,17 @@ public class BookingController {
         String email = authentication.getName();
         return ResponseEntity.ok(
                 bookingService.rejectBookingByEmail(bookingId, email)
+        );
+    }
+
+    @PatchMapping("/{bookingId}/completed")
+    public ResponseEntity<Booking> completeBooking(
+            @PathVariable Long bookingId,
+            Authentication authentication
+    ) {
+        String email = authentication.getName();
+        return ResponseEntity.ok(
+                bookingService.completeBookingByEmail(bookingId, email)
         );
     }
 }

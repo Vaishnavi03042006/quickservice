@@ -1,12 +1,15 @@
 package com.quickserve.app.service.impl;
 
+import com.quickserve.app.dto.BookingDetailResponse;
 import com.quickserve.app.dto.BookingRequest;
 import com.quickserve.app.model.*;
 import com.quickserve.app.repository.*;
 import com.quickserve.app.service.BookingService;
 import jakarta.transaction.Transactional;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.util.List;
 
 @Service
@@ -16,17 +19,20 @@ public class BookingServiceImpl implements BookingService {
     private final ServiceListingRepository serviceListingRepository;
     private final CalendarAvailabilityRepository calendarAvailabilityRepository;
     private final UserRepository userRepository;
+    private final ReviewRepository reviewRepository;
 
     public BookingServiceImpl(
             BookingRepository bookingRepository,
             ServiceListingRepository serviceListingRepository,
             CalendarAvailabilityRepository calendarAvailabilityRepository,
-            UserRepository userRepository
+            UserRepository userRepository,
+            ReviewRepository reviewRepository
     ) {
         this.bookingRepository = bookingRepository;
         this.serviceListingRepository = serviceListingRepository;
         this.calendarAvailabilityRepository = calendarAvailabilityRepository;
         this.userRepository = userRepository;
+        this.reviewRepository = reviewRepository;
     }
 
     // ✅ CREATE BOOKING (USER)
@@ -173,6 +179,73 @@ public class BookingServiceImpl implements BookingService {
         return bookingRepository.save(booking);
     }
 
+    @Override
+    @Transactional
+    public Booking completeBookingByEmail(Long bookingId, String email) {
+        User provider = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("Provider not found"));
+
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new IllegalArgumentException("Booking not found"));
+
+        if (!booking.getProviderId().equals(provider.getId())) {
+            throw new IllegalStateException("You are not allowed to complete this booking");
+        }
+
+        if (booking.getStatus() != BookingStatus.CONFIRMED) {
+            throw new IllegalStateException("Only CONFIRMED bookings can be completed");
+        }
+
+        booking.setStatus(BookingStatus.COMPLETED);
+
+        return bookingRepository.save(booking);
+    }
+
+    public BookingDetailResponse getMyBookingDetailByEmail(Long bookingId, String email) {
+
+        User user = userRepository
+                .findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        Booking booking = bookingRepository
+                .findByIdAndUserId(bookingId, user.getId())
+                .orElseThrow(() ->
+                        new AccessDeniedException("Booking not found or access denied")
+                );
+
+        ServiceListing listing = serviceListingRepository
+                .findById(booking.getServiceListingId())
+                .orElseThrow(() ->
+                        new RuntimeException("Service listing not found")
+                );
+
+        User provider = userRepository
+                .findById(booking.getProviderId())
+                .orElseThrow(() ->
+                        new RuntimeException("Provider not found")
+                );
+
+        long durationHours = Duration.between(
+                booking.getStartTime(),
+                booking.getEndTime()
+        ).toHours();
+
+        boolean reviewed = reviewRepository.existsByBookingAndUser(booking, user);
+
+
+        return new BookingDetailResponse(
+                booking.getId(),
+                listing.getTitle(),        // service title
+                provider.getId(),         // provider id
+                provider.getUsername(),       // provider name (or getFullName)
+                booking.getStatus().name(),
+                booking.getStartTime(),
+                booking.getEndTime(),
+                listing.getPrice(),
+                (int) durationHours,
+                reviewed                   // reviewed (not implemented yet)
+        );
+    }
 
 
 
